@@ -3,7 +3,7 @@ import django
 from datetime import date
 
 # Initialize Django environment within an isolated runtime script
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'breathe_backend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
 django.setup()
 
 from ingestion.models import EmissionFactor
