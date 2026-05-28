@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = "https://breathe-esg-backend-XXXX.onrender.com/api";
+// Fallback logic: Detects if running on Render or locally, keeping paths intact
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const API = isLocal ? "http://127.0.0.1:8080/api" : "https://breathe-esg-backend-nu5m.onrender.com/api";
 const CLIENT = "acme-manufacturing";
 
 const SCOPE_COLORS = {
@@ -41,8 +43,8 @@ export default function App() {
       if (filters.source_type) params.append("source_type", filters.source_type);
       
       const res = await axios.get(API + "/dashboard/?" + params.toString());
-      setSummary(res.data.summary);
-      setRecords(res.data.records);
+      setSummary(res.data?.summary ?? null);
+      setRecords(res.data?.records ?? []);
     } catch (err) {
       console.error("Dashboard fetch failed", err);
     }
@@ -52,7 +54,7 @@ export default function App() {
   const fetchBatches = async () => {
     try {
       const res = await axios.get(API + "/batches/?client_slug=" + CLIENT);
-      setBatches(res.data);
+      setBatches(res.data ?? []);
     } catch (err) {
       console.error("Batches fetch failed", err);
     }
@@ -67,31 +69,41 @@ export default function App() {
   }, [tab]);
 
   const handleApprove = async (id) => {
-    await axios.post(API + "/review/" + id + "/", { action: "approve", actor: "analyst" });
-    fetchDashboard();
+    try {
+      await axios.post(API + "/review/" + id + "/", { action: "approve", actor: "analyst" });
+      fetchDashboard();
+    } catch (err) {
+      console.error("Approval failed", err);
+    }
   };
 
   const handleReject = async (id) => {
-    await axios.post(API + "/review/" + id + "/", { action: "reject", actor: "analyst" });
-    fetchDashboard();
+    try {
+      await axios.post(API + "/review/" + id + "/", { action: "reject", actor: "analyst" });
+      fetchDashboard();
+    } catch (err) {
+      console.error("Rejection failed", err);
+    }
   };
 
   const handleUpload = async (e) => {
     e.preventDefault();
     const form = e.target;
     const data = new FormData();
-    data.append("sourcetype", form.source_type.value);
+    // Aligned to exact backend requirements keys
+    data.append("source_type", form.source_type.value);
     data.append("client_slug", CLIENT);
     data.append("file", form.file.files[0]);
     
     setUploading(true);
     setUploadResult(null);
     try {
+      // Clean trailing slash to prevent local Django redirect loops
       const res = await axios.post(API + "/upload/", data);
       setUploadResult({ ok: true, ...res.data });
       fetchDashboard();
     } catch (err) {
-      setUploadResult({ ok: false, error: err.response?.data?.error || "Upload failed" });
+      setUploadResult({ ok: false, error: err.response?.data?.error || "Upload connection rejected" });
     }
     setUploading(false);
     form.reset();
@@ -189,7 +201,7 @@ export default function App() {
                           {r.scope ? r.scope.replace("SCOPE_", "S") : ""}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 14px", color: "#64748b" }}>{SOURCE_LABELS[r.sourcetype] || r.sourcetype}</td>
+                      <td style={{ padding: "10px 14px", color: "#64748b" }}>{SOURCE_LABELS[r.source_type] || r.source_type}</td>
                       <td style={{ padding: "10px 14px", fontWeight: 500 }}>{r.category}</td>
                       <td style={{ padding: "10px 14px", color: "#64748b", fontSize: 12 }}>
                         {r.period_start === r.period_end ? r.period_start : r.period_start + " → " + r.period_end}
@@ -206,9 +218,9 @@ export default function App() {
                         </span>
                       </td>
                       <td style={{ padding: "10px 14px", maxWidth: 200 }}>
-                        {r.flaggedreason && (
-                          <span style={{ color: "#f97316", fontSize: 11 }} title={r.flaggedreason}>
-                            ⚠ {r.flaggedreason.length > 40 ? r.flaggedreason.slice(0, 40) + "…" : r.flaggedreason}
+                        {r.flagged_reason && (
+                          <span style={{ color: "#f97316", fontSize: 11 }} title={r.flagged_reason}>
+                            ⚠ {r.flagged_reason.length > 40 ? r.flagged_reason.slice(0, 40) + "…" : r.flagged_reason}
                           </span>
                         )}
                       </td>
@@ -285,7 +297,7 @@ export default function App() {
               <tbody>
                 {batches && batches.map((b, i) => (
                   <tr key={b.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                    <td style={{ padding: "10px 14px" }}>{SOURCE_LABELS[b.sourcetype] || b.sourcetype}</td>
+                    <td style={{ padding: "10px 14px" }}>{SOURCE_LABELS[b.source_type] || b.source_type}</td>
                     <td style={{ padding: "10px 14px", fontFamily: "monospace", fontSize: 12 }}>{b.filename}</td>
                     <td style={{ padding: "10px 14px" }}>
                       <span style={{ background: b.status === "DONE" ? "#f0fdf4" : "#fef9c3", color: b.status === "DONE" ? "#15803d" : "#92400e", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
