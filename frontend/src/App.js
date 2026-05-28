@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-// Fallback logic: Detects if running on Render or locally, keeping paths intact
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-const API = isLocal ? "http://127.0.0.1:8080/api" : "https://breathe-esg-backend-nu5m.onrender.com/api";
+// Static target mapped to your running local Django service port
+// Mapped to your new secure forwarding tunnel gateway
+const API = "http://localhost:8080/api";
 const CLIENT = "acme-manufacturing";
 
 const SCOPE_COLORS = {
@@ -90,15 +90,13 @@ export default function App() {
     e.preventDefault();
     const form = e.target;
     const data = new FormData();
-    // Aligned to exact backend requirements keys
     data.append("source_type", form.source_type.value);
     data.append("client_slug", CLIENT);
     data.append("file", form.file.files[0]);
     
     setUploading(true);
-    setUploadResult(null);
+    uploadResult && setUploadResult(null);
     try {
-      // Clean trailing slash to prevent local Django redirect loops
       const res = await axios.post(API + "/upload/", data);
       setUploadResult({ ok: true, ...res.data });
       fetchDashboard();
